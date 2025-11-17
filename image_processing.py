@@ -3,13 +3,13 @@ import numpy as np
 
 
 def apply_clahe(gray_img):
-    """Apply CLAHE contrast normalization."""
+    # Apply CLAHE contrast normalization
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
     return clahe.apply(gray_img)
 
 
 def binarize_adaptive(gray_img):
-    """Adaptive thresholding."""
+    # Adaptive thresholding
     return cv2.adaptiveThreshold(
         gray_img,
         255,
@@ -41,15 +41,19 @@ def getSkewAngle(cvImage) -> float:
 
     # Find largest contour and surround in min area box
     largestContour = contours[0]
-    print (len(contours))
     minAreaRect = cv2.minAreaRect(largestContour)
-    cv2.imwrite("temp/boxes.jpg", newImage)
-    # Determine the angle. Convert it to the value that was originally used to obtain skewed image
+
+    # Determine the angle
     angle = minAreaRect[-1]
-    if angle < -45:
-        angle = 90 + angle
-    return -1.0 * angle
-# Rotate the image around its center
+    print(f"Detected skew angle: {angle:.2f} degrees")
+
+    # Correction for negative angles
+    if angle > 45:
+        angle = 270 + angle
+
+    return angle
+
+
 def deskew(cvImage, angle: float):
     newImage = cvImage.copy()
     (h, w) = newImage.shape[:2]
@@ -59,66 +63,76 @@ def deskew(cvImage, angle: float):
     return newImage
 
 
-def crop_text_region(image):
-    """Find and crop the main text block."""
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    th = cv2.threshold(gray, 0, 255,
-                       cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-
-    cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not cnts:
-        return image  # fallback
-
-    # largest contour = main text region
-    c = max(cnts, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(c)
-    return image[y:y+h, x:x+w]
-
-
-def process_image(input_path, invert_colors=False):
+def process_image(input_path, clahe, invert_colors):
     img = cv2.imread(input_path)
+    if img is None:
+        raise FileNotFoundError(f"Could not read input image: {input_path}")
 
     # 1. Grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # 2. CLAHE
-    clahe_img = apply_clahe(gray)
+    clahe_img = gray
+
+    if clahe:
+        print("Applying CLAHE...")
+        clahe_img = apply_clahe(gray)
 
     # 3. Noise reduction
     blurred = cv2.GaussianBlur(clahe_img, (5, 5), 0)
 
     # 4. Adaptive thresholding
-    bin_img = binarize_adaptive(clahe_img)
+    bin_img = binarize_adaptive(blurred)
 
     # 5. Optional inversion
     if invert_colors:
         bin_img = cv2.bitwise_not(bin_img)
 
-    # Prepare for deskewing: work on original but with new mask
+    # Get deskew angle
     pre_deskew = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
-    angle = getSkewAngle(img)
-    # 6. Deskew
-    deskewed = deskew(img, -1 * angle)
+    angle = getSkewAngle(pre_deskew)
 
-    # 7. Crop text block
-    cropped = crop_text_region(deskewed)
+    # 6. Deskew
+    deskewed = deskew(pre_deskew, angle)
 
     return {
         "gray": gray,
         "clahe": clahe_img,
         "blurred": blurred,
         "binarized": bin_img,
-        "deskewed": deskewed,
-        "cropped": cropped
+        "deskewed": deskewed
     }
 
 
 if __name__ == "__main__":
-    input_image = "p24.jpg"
-    results = process_image(input_image, invert_colors=True)
+    import argparse
+    import os
+
+    # Parse arguments
+    parser = argparse.ArgumentParser(description="Process an image and prepare outputs for OCR.")
+    parser.add_argument("input_image", nargs="?", default="test_images\\document-p24.jpg",
+                        help="Path to the input image (default: test_images\\document-p24.jpg)")
+
+    # Use flags to enable/disable CLAHE
+    parser.add_argument("--no-clahe", dest="clahe", action="store_false",
+                        help="Disable CLAHE contrast normalization.")
+    parser.set_defaults(clahe=True)
+
+    # Use a flag for invert
+    parser.add_argument("--invert", action="store_true", default=False,
+                        help="Invert colors after binarization (default: False)")
+
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.input_image):
+        raise SystemExit(f"Input file not found: {args.input_image}")
+    
+    # Process image
+    results = process_image(args.input_image, clahe=args.clahe, invert_colors=args.invert)
 
     # Save results
     for key, img in results.items():
-        cv2.imwrite(f"{key}.png", img)
+        out_path = os.path.join("results", f"{key}.png")
+        cv2.imwrite(out_path, img)
 
-    print("Processing complete! Output images saved.")
+    print(f"Processing complete! Output images saved to: results")
