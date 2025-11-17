@@ -72,11 +72,7 @@ def process_image(input_path, clahe, invert_colors):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # 2. CLAHE
-    clahe_img = gray
-
-    if clahe:
-        print("Applying CLAHE...")
-        clahe_img = apply_clahe(gray)
+    clahe_img = apply_clahe(gray) if clahe else gray
 
     # 3. Noise reduction
     blurred = cv2.GaussianBlur(clahe_img, (5, 5), 0)
@@ -113,12 +109,11 @@ if __name__ == "__main__":
     parser.add_argument("input_image", nargs="?", default="test_images\\document-p24.jpg",
                         help="Path to the input image (default: test_images\\document-p24.jpg)")
 
-    # Use flags to enable/disable CLAHE
+    # Use flags to enable/disable CLAHE and inversion
     parser.add_argument("--no-clahe", dest="clahe", action="store_false",
-                        help="Disable CLAHE contrast normalization.")
+                        help="Disable CLAHE contrast normalization if the image is clear enough.")
     parser.set_defaults(clahe=True)
 
-    # Use a flag for invert
     parser.add_argument("--invert", action="store_true", default=False,
                         help="Invert colors after binarization (default: False)")
 
