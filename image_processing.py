@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pytesseract
+from pathlib import Path
 
 
 def apply_clahe(gray_img):
@@ -126,6 +127,9 @@ if __name__ == "__main__":
 
     if not os.path.isfile(args.input_image):
         raise SystemExit(f"Input file not found: {args.input_image}")
+    
+    # Clear characters directory
+    [f.unlink() for f in Path("characters").iterdir() if f.is_file()]
     
     # Process image
     results = process_image(args.input_image, clahe=args.clahe, invert_colors=args.invert)
