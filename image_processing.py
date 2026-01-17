@@ -135,11 +135,44 @@ if __name__ == "__main__":
         out_path = os.path.join("results", f"{key}.png")
         cv2.imwrite(out_path, img)
 
-    print(f"Processing complete! Output images saved to: results")
+    print(f"\nProcessing complete! Output images saved to: results")
 
-    # Example OCR on deskewed image
-    final_img = results["final"]
-    final_img_rgb = cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB)
-    ocr_result = pytesseract.image_to_string(final_img_rgb)
-    print("OCR Result:\n")
-    print(ocr_result)
+    # Tesseract OCR using image_to_string
+    final_img = cv2.cvtColor(results["final"], cv2.COLOR_BGR2RGB)
+    ocr_result = pytesseract.image_to_string(final_img)
+
+    with open(os.path.join("results", "text_result.txt"), "w") as text_file:
+        text_file.write(ocr_result)
+
+    print(f"OCR result saved to: results/text_result.txt\n")
+
+    # Detecting individual characters with bounding boxes
+    h, w = final_img.shape[:2]
+    boxes = pytesseract.image_to_boxes(final_img)
+    boxed_img = final_img.copy()
+
+    for idx, b in enumerate(boxes.splitlines()):
+        b = b.split(' ')
+        char, x1, y1, x2, y2 = b[0], int(b[1]), int(b[2]), int(b[3]), int(b[4])
+        cv2.rectangle(boxed_img, (x1, h - y2), (x2, h - y1), (0, 255, 0), 2)
+        cv2.putText(boxed_img, char, (x1, h - y1 + 25), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # Save an image for each character
+        char_img = final_img[h - y2:h - y1, x1:x2]
+        char_out_path = os.path.join("characters", f"{idx}.png")
+        cv2.imwrite(char_out_path, char_img)
+
+    cv2.imwrite(os.path.join("results", "boxed_characters.png"), boxed_img)
+    print(f"Character bounding box image saved to: results/boxed_characters.png\n")
+
+    # Load character images
+    characters_dir = "characters"
+
+    files = sorted(
+        os.listdir(characters_dir),
+        key=lambda x: int(os.path.splitext(x)[0])
+    )
+
+    images = [
+        cv2.imread(os.path.join(characters_dir, f))
+        for f in files
+    ]
