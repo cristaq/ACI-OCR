@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import pytesseract
 
 
 def apply_clahe(gray_img):
@@ -88,15 +89,19 @@ def process_image(input_path, clahe, invert_colors):
     pre_deskew = cv2.cvtColor(bin_img, cv2.COLOR_GRAY2BGR)
     angle = getSkewAngle(pre_deskew)
 
-    # 6. Deskew
+    # 6. Deskew binarized image
     deskewed = deskew(pre_deskew, angle)
+
+    # Deskew gray image
+    final = deskew(clahe_img, angle)
 
     return {
         "gray": gray,
         "clahe": clahe_img,
         "blurred": blurred,
         "binarized": bin_img,
-        "deskewed": deskewed
+        "deskewed": deskewed,
+        "final": final
     }
 
 
@@ -131,3 +136,10 @@ if __name__ == "__main__":
         cv2.imwrite(out_path, img)
 
     print(f"Processing complete! Output images saved to: results")
+
+    # Example OCR on deskewed image
+    final_img = results["final"]
+    final_img_rgb = cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB)
+    ocr_result = pytesseract.image_to_string(final_img_rgb)
+    print("OCR Result:\n")
+    print(ocr_result)
