@@ -161,7 +161,7 @@ if __name__ == "__main__":
         cv2.rectangle(boxed_img, (x1, h - y2), (x2, h - y1), (0, 255, 0), 2)
         cv2.putText(boxed_img, char, (x1, h - y1 + 25), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
         # Save an image for each character
-        char_img = final_img[h - y2:h - y1, x1:x2]
+        char_img = final_img[h - y2 - 5:h - y1 + 5, x1 - 5:x2 + 5]
         char_out_path = os.path.join("characters", f"{idx}.png")
         cv2.imwrite(char_out_path, char_img)
 
